@@ -31,7 +31,7 @@ static void __pd_smbuf_insert_buf(pd_smbuf_t **root, const char *buf)
         }
 
         tmp->buf[tmp->buflen++] = *buf++;
-	}
+    }
 
 	return;
 }

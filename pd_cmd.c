@@ -14,7 +14,7 @@ static pd_cmd_t avail_cmds[] = {
 
 pd_smbuf_t *pd_cmd_parse_cmd(const char *cmd)
 {
-	char buf[128], *pbuf;
+    char buf[128], *pbuf;
     pd_smbuf_t *cmds;
 
     pbuf = buf;

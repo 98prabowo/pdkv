@@ -86,7 +86,7 @@ pd_tree_t *pd_tree_search(pd_tree_t *root, pd_tree_t *node)
 }
 
 pd_tree_t *pd_tree_search_fn(pd_tree_t *root, pd_tree_t *node,
-                        int (*compare)(pd_tree_t *, pd_tree_t *))
+                             int (*compare)(pd_tree_t *, pd_tree_t *))
 {
     if (root == NULL || !compare(root, node))
         return root;

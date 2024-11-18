@@ -12,7 +12,7 @@
 static void pd_hdlr_get(pd_tree_t **root, pd_smbuf_t *cmds,
                         pd_net_t *net, pd_smbuf_t *key, pd_smbuf_t *value)
 {
-	int rsize;
+    int rsize;
     char resp[PD_RESP_MAXLEN];
     pd_tree_t *ret;
 

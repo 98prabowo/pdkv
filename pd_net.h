@@ -15,7 +15,7 @@ void pd_net_accept(pd_net_t **net);
 void pd_net_release(pd_net_t *net);
 
 int pd_net_bind(pd_net_t **net, const char *addr,
-                 unsigned short port);
+                unsigned short port);
 int pd_net_listen(pd_net_t **net, int backlog);
 int pd_net_close_socket(pd_net_t **net);
 int pd_net_close_accept(pd_net_t **net);

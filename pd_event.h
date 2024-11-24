@@ -35,13 +35,33 @@
 #ifndef __PD_EVENT_H
 #define __PD_EVENT_H
 
+#include <pthread.h>
+#include <sys/epoll.h>
+
+#include <pd_cmd.h>
 #include <pd_hdlr.h>
 #include <pd_net.h>
 #include <pd_tree.h>
 
-#define PD_MAX_BACKLOG 4096
+#define PD_NETEV_POLLFD_SIZE 1024
 
-int pd_event_loop(pd_net_t *net,
-                  pd_tree_t *tree, pd_hdlr_t *hdlr);
+typedef struct pd_event {
+    int ev_fd;
+    pd_tree_t *ev_tree;
+    pd_cmd_args_t *ev_cmds;
+    struct epoll_event ev_curr;
+    struct epoll_event ev_list[PD_NETEV_POLLFD_SIZE];
+
+    int (*ev_rfn)(int, pd_tree_t **, pd_hdlr_t *, pd_cmd_args_t **, int *);
+    int (*ev_wfn)(int, pd_tree_t **, pd_hdlr_t *, pd_cmd_args_t **, int *);
+    int (*ev_efn)(int, pd_tree_t **, pd_hdlr_t *, pd_cmd_args_t **, int *);
+} pd_event_t;
+
+pd_event_t *pd_event_alloc(void);
+pd_event_t *pd_event_init(pd_net_t *net);
+
+void pd_event_release(pd_event_t *ev);
+
+int pd_event_dispatch(pd_event_t *ev, pd_net_t *net, pd_hdlr_t *hdlr);
 
 #endif /* __PD_EVENT_H */

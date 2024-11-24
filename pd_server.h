@@ -35,6 +35,14 @@
 #ifndef __PD_SERVER_H
 #define __PD_SERVER_H
 
+#include <sys/socket.h>
+
+#ifdef SOMAXCONN
+#define PD_SERVER_MAX_BACKLOG SOMAXCONN
+#else
+#define PD_SERVER_MAX_BACKLOG 4096
+#endif
+
 int pd_run_server(void);
 
 #endif /* __PD_SERVER_H */

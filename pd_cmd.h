@@ -35,14 +35,28 @@
 #ifndef __PD_CMD_H
 #define __PD_CMD_H
 
+#include <stddef.h>
 #include <pd_smbuf.h>
+
+#define PD_CMD_AUXBUF_LEN 64
 
 typedef struct pd_cmd {
     char *cmd;
     size_t arity;
 } pd_cmd_t;
 
-pd_smbuf_t *pd_cmd_parse_cmd(const char *cmd);
-int pd_cmd_validate_cmd(pd_smbuf_t *cmds);
+typedef struct pd_cmd_args {
+    size_t plen;
+    pd_smbuf_t *pcmd;
+    pd_smbuf_t *paux[PD_CMD_AUXBUF_LEN];
+} pd_cmd_args_t;
+
+pd_cmd_args_t *pd_cmd_args_alloc(void);
+
+int pd_cmd_parse_cmd(pd_cmd_args_t **pargs, const char *cmd);
+int pd_cmd_validate_cmd(pd_cmd_args_t *pargs);
+
+void pd_cmd_args_release(pd_cmd_args_t **pargs);
+void pd_cmd_args_release_smbuf(pd_cmd_args_t **pargs);
 
 #endif /* __PD_CMD_H */

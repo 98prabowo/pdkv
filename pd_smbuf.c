@@ -84,6 +84,26 @@ pd_smbuf_t *pd_smbuf_init(const char *buf)
     return ret;
 }
 
+pd_smbuf_t *pd_smbuf_copy(pd_smbuf_t *sbuf)
+{
+    int i;
+    pd_smbuf_t *ret;
+
+    if (!sbuf)
+        return NULL;
+
+    ret = calloc(1, sizeof(pd_smbuf_t));
+
+    if (!ret)
+        return NULL;
+
+    for (i = 0; i < sbuf->buflen; i++)
+        ret->buf[ret->buflen++] = sbuf->buf[i];
+
+    pd_smbuf_append(&ret, pd_smbuf_copy(sbuf->next));
+    return ret;
+}
+
 void pd_smbuf_insert_buf(pd_smbuf_t **root, const char *buf)
 {
     __pd_smbuf_insert_buf(root, buf);
@@ -95,6 +115,9 @@ void pd_smbuf_append(pd_smbuf_t **root, pd_smbuf_t *buf)
 
     tmp = *root;
 
+    if (!buf)
+        return;
+
     while (tmp->next != NULL)
         tmp = tmp->next;
 
@@ -105,6 +128,9 @@ void pd_smbuf_append(pd_smbuf_t **root, pd_smbuf_t *buf)
 
 void pd_smbuf_release(pd_smbuf_t *root)
 {
+    if (!root)
+        return;
+
     pd_smbuf_release(root->next);
     free(root);
 }

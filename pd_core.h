@@ -32,60 +32,38 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __PD_CORE_H
+#define __PD_CORE_H
+
+#include <stdio.h>
 #include <stdlib.h>
 
-#include <pd_event.h>
-#include <pd_hdlr.h>
-#include <pd_net.h>
-#include <pd_server.h>
-#include <pd_tree.h>
+#define pd_assert(c, m) do { \
+    if (!(c)) { \
+        fprintf(stderr, (m)); \
+        abort(); \
+    } \
+} while (0)
 
-int pd_run_server(void)
-{
-    pd_event_t *ev;
-    pd_hdlr_t *hdlr;
-    pd_net_t *net;
+#ifndef __builtin_types_compatible_p
+#define __pd_same_type(a, b) ({ (1); })
+#else
+#define __pd_same_type(a, b) __builtin_types_compatible_p(typeof(a), typeof(b))
+#endif
 
-    net = pd_net_alloc();
+#ifndef __builtin_offsetof
+#define pd_offset_of(type, member) ((unsigned long)&(((type *)0)->member))
+#else
+#define pd_offset_of(type, member) __builtin_offsetof(type, member)
+#endif
 
-    if (!net)
-        goto __fallback;
+#define pd_container_of(ptr, type, member) ({                                                         \
+        void *__mptr = (void *)(ptr);                            \
+        int __c0 = __pd_same_type(*(ptr), ((type *)0)->member);  \
+        int __c1 = __pd_same_type(*(ptr), void);                 \
+        pd_assert(__c0 || __c1,                                  \
+                  "pointer type mismatch is pd_container_of()"); \
+        ((type *)(__mptr - pd_offset_of(type, member)));         \
+    })
 
-    hdlr = pd_hdlr_alloc();
-
-    if (!hdlr)
-        goto __release_net;
-
-    pd_hdlr_build(&hdlr);
-    pd_net_open(&net);
-
-    if (pd_net_socket_set_opt_reuseaddr(&net) < 0 ||
-        pd_net_socket_set_opt_keepalive(&net) < 0 ||
-        pd_net_socket_set_opt_tcp_nodelay(&net))
-        goto __release_hdlr;
-
-    if (pd_net_bind(&net, "0.0.0.0", 31337) < 0)
-        goto __release_hdlr;
-
-    if (pd_net_listen(&net, PD_SERVER_MAX_BACKLOG) < 0)
-        goto __release_hdlr;
-
-    if (pd_net_socket_set_nb(&net) < 0)
-        goto __release_hdlr;
-
-    ev = pd_event_init(net);
-
-    if (!ev)
-        goto __release_hdlr;
-
-    pd_event_dispatch(ev, net, hdlr);
-
-__release_hdlr:
-    pd_hdlr_release(hdlr);
-
-__release_net:
-    pd_net_release(net);
-
-__fallback:
-    return -1;
-}
+#endif /* __PD_CORE_H */

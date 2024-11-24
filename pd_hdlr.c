@@ -37,20 +37,24 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <pd_cmd.h>
+#include <pd_core.h>
 #include <pd_hdlr.h>
 #include <pd_smbuf.h>
 #include <pd_tree.h>
 
 #define PD_RESP_MAXLEN 1024
 
-static void pd_hdlr_get(pd_tree_t **root, pd_smbuf_t *cmds,
-                        pd_net_t *net, pd_smbuf_t *key, pd_smbuf_t *value)
+static void pd_hdlr_get(pd_tree_t ***root, pd_smbuf_t **cmds, pd_net_t *net,
+                        int fd, pd_smbuf_t *key, pd_smbuf_t *value)
 {
-    int rsize;
+    int rsize, tfd;
     char resp[PD_RESP_MAXLEN];
-    pd_tree_t *ret;
+    pd_tree_t *ret, *tmp;
 
-    ret = pd_tree_search_key(*root, key->buf);
+    tfd = net == NULL ? fd : net->accept;
+    tmp = **root;
+    ret = pd_tree_search_key(tmp, key->buf);
 
     if (!ret) {
         memset(resp, 0, PD_RESP_MAXLEN);
@@ -62,7 +66,7 @@ static void pd_hdlr_get(pd_tree_t **root, pd_smbuf_t *cmds,
             key->buf
         );
 
-        write(net->accept, resp, rsize);
+        write(tfd, resp, rsize);
         return;
     }
 
@@ -76,17 +80,30 @@ static void pd_hdlr_get(pd_tree_t **root, pd_smbuf_t *cmds,
         ret->data->value->buf
     );
 
-    write(net->accept, resp, rsize);
+    write(tfd, resp, rsize);
     return;
 }
 
-static void pd_hdlr_set(pd_tree_t **root, pd_smbuf_t *cmds,
-                        pd_net_t *net, pd_smbuf_t *key, pd_smbuf_t *value)
+static void pd_hdlr_set(pd_tree_t ***root, pd_smbuf_t **cmds, pd_net_t *net,
+                        int fd, pd_smbuf_t *key, pd_smbuf_t *value)
 {
+    int tfd;
+    pd_smbuf_t *tkey, *tval;
     pd_tree_t *tree;
     pd_tree_data_t *data;
 
-    data = pd_tree_data_init(key, value);
+    tkey = pd_smbuf_copy(key);
+
+    if (!tkey)
+        return;
+
+    tval = pd_smbuf_copy(value);
+
+    if (!tval)
+        return;
+
+    tfd  = net == NULL ? fd : net->accept;
+    data = pd_tree_data_init(tkey, tval);
 
     if (!data)
         return;
@@ -96,56 +113,61 @@ static void pd_hdlr_set(pd_tree_t **root, pd_smbuf_t *cmds,
     if (!tree)
         return;
 
-    pd_tree_insert(root, tree);
-
-    write(net->accept, "+OK\n", 4);
+    pd_tree_insert(*root, tree);
+    write(tfd, "+OK\n", 4);
 }
 
-static void pd_hdlr_delete(pd_tree_t **root, pd_smbuf_t *cmds,
-                           pd_net_t *net, pd_smbuf_t *key, pd_smbuf_t *value)
+static void pd_hdlr_delete(pd_tree_t ***root, pd_smbuf_t **cmds, pd_net_t *net,
+                           int fd, pd_smbuf_t *key, pd_smbuf_t *value)
 {
-    pd_tree_t *ret;
+    int tfd;
+    pd_tree_t *ret, *tmp;
 
-    ret = pd_tree_search_key(*root, key->buf);
+    tfd = !net ? fd : net->accept;
+    tmp = **root;
+    ret = pd_tree_search_key(tmp, key->buf);
 
     if (!ret) {
-        write(net->accept, ":0\n", 3);
+        write(tfd, ":0\n", 3);
         return;
     }
 
-    pd_tree_delete(root, ret);
-    write(net->accept, ":1\n", 3);
+    pd_tree_delete(*root, ret);
+    write(tfd, ":1\n", 3);
     return;
 }
 
-static void pd_hdlr_invalid(pd_tree_t **root, pd_smbuf_t *cmds,
-                            pd_net_t *net, pd_smbuf_t *key, pd_smbuf_t *value)
+static void pd_hdlr_invalid(pd_tree_t ***root, pd_smbuf_t **cmds, pd_net_t *net,
+                            int fd, pd_smbuf_t *key, pd_smbuf_t *value)
 {
-    int rsize;
+    int n, rsize, tfd;
     char resp[PD_RESP_MAXLEN];
-    pd_smbuf_t *cmd;
+    pd_cmd_args_t *pargs;
 
+    tfd   = !net ? fd : net->accept;
     rsize = snprintf(
         resp,
         PD_RESP_MAXLEN,
         "-ERR unknown command `%s`, with args beginning with: ",
-        cmds->buf
+        (*cmds)->buf
     );
 
-    write(net->accept, resp, rsize);
+    write(tfd, resp, rsize);
 
-    pd_smbuf_for_each(cmd, cmds->next) {
+    pargs = pd_container_of(cmds, pd_cmd_args_t, pcmd);
+
+    for (n = 0; n < pargs->plen; n++) {
         rsize = snprintf(
             resp,
             PD_RESP_MAXLEN,
-            !cmd->next ? "`%s`" : "`%s`, ",
-            cmd->buf
+            n == (pargs->plen - 1) ? "`%s`" : "`%s`, ",
+            pargs->paux[n]->buf
         );
 
-        write(net->accept, resp, rsize);
+        write(tfd, resp, rsize);
     }
 
-    write(net->accept, "\n", 1);
+    write(tfd, "\n", 1);
     return;
 }
 
@@ -162,8 +184,8 @@ pd_hdlr_t *pd_hdlr_alloc(void)
 }
 
 void pd_hdlr_register(pd_hdlr_t **hdlr, pd_hdlr_type_t type,
-                      void (*fn)(pd_tree_t **, pd_smbuf_t *,
-                                 pd_net_t *, pd_smbuf_t *, pd_smbuf_t *))
+                      void (*fn)(pd_tree_t ***, pd_smbuf_t **,
+                                 pd_net_t *, int, pd_smbuf_t *, pd_smbuf_t *))
 {
     switch (type) {
         case GET:

@@ -38,12 +38,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define pd_assert(c, m) do { \
-    if (!(c)) { \
-        fprintf(stderr, (m)); \
-        abort(); \
-    } \
-} while (0)
+#define pd_assert(c, m)                                                        \
+  do {                                                                         \
+    if (!(c)) {                                                                \
+      fprintf(stderr, (m));                                                    \
+      abort();                                                                 \
+    }                                                                          \
+  } while (0)
 
 #ifndef __builtin_types_compatible_p
 #define __pd_same_type(a, b) ({ (1); })
@@ -57,13 +58,13 @@
 #define pd_offset_of(type, member) __builtin_offsetof(type, member)
 #endif
 
-#define pd_container_of(ptr, type, member) ({                                                         \
-        void *__mptr = (void *)(ptr);                            \
-        int __c0 = __pd_same_type(*(ptr), ((type *)0)->member);  \
-        int __c1 = __pd_same_type(*(ptr), void);                 \
-        pd_assert(__c0 || __c1,                                  \
-                  "pointer type mismatch is pd_container_of()"); \
-        ((type *)(__mptr - pd_offset_of(type, member)));         \
-    })
+#define pd_container_of(ptr, type, member)                                     \
+  ({                                                                           \
+    void *__mptr = (void *)(ptr);                                              \
+    int __c0 = __pd_same_type(*(ptr), ((type *)0)->member);                    \
+    int __c1 = __pd_same_type(*(ptr), void);                                   \
+    pd_assert(__c0 || __c1, "pointer type mismatch is pd_container_of()");     \
+    ((type *)(__mptr - pd_offset_of(type, member)));                           \
+  })
 
 #endif /* __PD_CORE_H */

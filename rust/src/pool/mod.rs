@@ -1,13 +1,15 @@
+mod error;
+mod worker;
+
 use std::sync::{
     mpsc::{channel, Sender}, 
     Arc, 
     Mutex
 };
 
-use crate::{
-    error::KVError, 
-    worker::{Job, Worker}
-};
+use worker::{Job, Worker};
+
+pub use error::{Error, Result};
 
 pub struct ThreadPool {
     workers: Vec<Worker>,
@@ -15,9 +17,9 @@ pub struct ThreadPool {
 }
 
 impl ThreadPool {
-    pub fn build(size: usize) -> Result<Self, KVError> {
+    pub fn build(size: usize) -> Result<Self> {
         if size <= 0 {
-            return Err(KVError::InvalidSize)
+            return Err(Error::InvalidPoolSize)
         }
 
         let (sender, receiver) = channel();
@@ -34,7 +36,7 @@ impl ThreadPool {
         Ok(Self { workers, sender })
     }
 
-    pub fn execute<F>(&self, task: F)
+    pub fn execute<F>(&self, task: F) -> Result<()>
     where 
         F: FnOnce() + Send + 'static
     {
@@ -42,9 +44,11 @@ impl ThreadPool {
 
         self.sender
             .as_ref()
-            .expect("Sender is null")
+            .ok_or(Error::SenderIsNil)?
             .send(job)
-            .expect("Receiver has dropped");
+            .map_err(|_| Error::ReceiverIsDropped)?;
+
+        Ok(())
     }
 }
 
@@ -56,7 +60,9 @@ impl Drop for ThreadPool {
             println!("Shutting down worker {}", worker.id);
 
             if let Some(thread) = worker.thread.take() {
-                thread.join().unwrap();
+                thread
+                    .join()
+                    .expect(format!("Couldn't join thread on worker {}", worker.id).as_str());
             }
         }
     }

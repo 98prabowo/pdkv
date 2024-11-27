@@ -1,36 +1,40 @@
 use std::{
     collections::HashMap,
-    net::TcpListener,
+    net::{IpAddr, SocketAddr, TcpListener},
     sync::{Arc, Mutex},
 };
 
 use crate::{
-    controller::Controller,
-    pool::ThreadPool
+    controller::Controller, error::Result, model::AtomicDB, pool::ThreadPool
 };
 
 pub struct Server {
-    db: Arc<Mutex<HashMap<String, String>>>,
+    addr: SocketAddr,
+    db: AtomicDB,
 }
 
 impl Server {
-    pub fn init() -> Self {
+    pub fn init(addr: IpAddr, port: u16) -> Self {
         Self {
+            addr: SocketAddr::new(addr, port),
             db: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    pub fn run(&self) {
-        let listener = TcpListener::bind("127.0.0.1:31337").unwrap();
-        let pool = ThreadPool::build(10).expect("Invalid thread pool size. Size must be more than zero");
+    pub fn run(&self) -> Result<()> {
+        let listener = TcpListener::bind(self.addr)?;
+        let pool = ThreadPool::build(10)?;
 
         for stream in listener.incoming() {
-            let mut stream = stream.unwrap();
-            let db = Arc::clone(&self.db);
+            if let Ok(mut stream) = stream {
+                let db = Arc::clone(&self.db);
 
-            pool.execute(move || {
-                Controller::handle_cmd(&mut stream, db);
-            });
+                pool.execute(move || {
+                    Controller::handle_input(&mut stream, db);
+                })?;
+            }
         }
+
+        Ok(())
     }
 }

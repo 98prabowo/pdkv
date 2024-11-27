@@ -1,13 +1,18 @@
-mod cmd;
 mod controller;
 mod error;
+mod model;
 mod pool;
 mod server;
-mod worker;
 
+use std::net::{IpAddr, Ipv4Addr};
+
+use error::Result;
 use server::Server;
 
-fn main() {
-    let server = Server::init();
-    server.run();
+fn main() -> Result<()> {
+    let ip = Ipv4Addr::new(127, 0, 0, 1);
+    let addr = IpAddr::V4(ip);
+    let port: u16 = 31337;
+    let server: Server = Server::init(addr, port);
+    server.run()
 }

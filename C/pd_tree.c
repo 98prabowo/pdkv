@@ -97,14 +97,16 @@ pd_tree_t *pd_tree_init(pd_tree_data_t *data)
         return NULL;
 
     pd_smbuf_for_each(el, data->key)
-        hash += pd_hash(el->buf);
+        hash ^= pd_hash(el->buf);
 
     pd_smbuf_for_each(el, data->value)
-        hash += pd_hash(el->buf);
+        hash ^= pd_hash(el->buf);
 
     ret->hash   = hash;
     ret->data   = data;
-    ret->parent = ret->left = ret->right = NULL;
+    ret->parent = NULL;
+    ret->left   = NULL;
+    ret->right  = NULL;
 
     return ret;
 }
@@ -133,16 +135,19 @@ pd_tree_t *pd_tree_search_fn(pd_tree_t *root, pd_tree_t *node,
 
 pd_tree_t *pd_tree_search_key(pd_tree_t *root, const char *buf)
 {
+    int res;
+
     if (root == NULL)
         return NULL;
 
-    if (!strcmp(buf, root->data->key->buf))
+    res = strcmp(root->data->key->buf, buf);
+
+    if (!res)
         return root;
 
-    if (strcmp(buf, root->data->key->buf))
-        return pd_tree_search_key(root->left, buf);
-
-    return pd_tree_search_key(root->right, buf);
+    return res < 0
+        ? pd_tree_search_key(root->left, buf)
+        : pd_tree_search_key(root->right, buf);
 }
 
 pd_tree_t *pd_tree_min(pd_tree_t *root)
@@ -171,27 +176,23 @@ pd_tree_t *pd_tree_max(pd_tree_t *root)
 
 void pd_tree_insert(pd_tree_t **root, pd_tree_t *node)
 {
-    pd_tree_t *tmp, *res;
-
-    tmp = (*root);
-    res = NULL;
-
-    while (tmp != NULL) {
-        res = tmp;
-        tmp = res->hash < tmp->hash ? tmp->left : tmp->right;
-    }
-
-    node->parent = res;
-
-    if (res == NULL) {
+    if (!(*root)) {
         *root = node;
         return;
     }
 
-    if (node->hash < res->hash)
-        res->left = node;
-    else
-        res->right = node;
+#if 0
+    if (node->hash == (*root)->hash)
+        return;
+#endif
+
+    if ((*root)->hash < node->hash) {
+        pd_tree_insert(&(*(root))->left, node);
+        (*root)->left->parent = (*root);
+    } else {
+        pd_tree_insert(&(*(root))->right, node);
+        (*root)->right->parent = (*root);
+    }
 }
 
 static void pd_tree_transplant(pd_tree_t **root,

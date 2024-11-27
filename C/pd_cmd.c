@@ -33,6 +33,7 @@
  */
 
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -46,24 +47,63 @@ static pd_cmd_t avail_cmds[] = {
     {"DEL", 1}
 };
 
-pd_smbuf_t *pd_cmd_parse_cmd(const char *cmd)
+pd_cmd_args_t *pd_cmd_args_alloc(void)
 {
-    char buf[128], *pbuf;
-    pd_smbuf_t *cmds;
+    pd_cmd_args_t *ret;
 
-    pbuf = buf;
-    cmds = NULL;
+    ret = calloc(1, sizeof(pd_cmd_args_t));
 
-    bzero(buf, 128);
+    if (!ret)
+        return NULL;
+
+    ret->plen = 0;
+    ret->pcmd = NULL;
+
+    return ret;
+}
+
+int pd_cmd_parse_cmd(pd_cmd_args_t **pargs, const char *cmd)
+{
+    pd_smbuf_t **cpbuf;
+    pd_cmd_args_t *targs;
+    char buf[129], *pbuf;
+
+    pbuf  = buf;
+    targs = *pargs;
+    cpbuf = NULL;
+
+    bzero(buf, 129);
 
     while (*cmd != '\0') {
-        if (*cmd == ' ') {
-            if (!cmds)
-                cmds = pd_smbuf_init(buf);
-            else
-                pd_smbuf_append(&cmds, pd_smbuf_init(buf));
+        if (strlen(buf) == 128) {
+            if (!cpbuf) {
+                cpbuf = &targs->pcmd;
+                targs->plen++;
+            }
 
-            bzero(buf, 128);
+            if (!(*cpbuf))
+                *cpbuf = pd_smbuf_init(buf);
+            else
+                pd_smbuf_insert_buf(cpbuf, buf);
+
+            bzero(buf, 129);
+            pbuf = buf;
+        }
+
+        if (*cmd == ' ') {
+            if (!cpbuf) {
+                cpbuf = &targs->pcmd;
+                targs->plen++;
+            } else {
+                cpbuf = &targs->paux[targs->plen++ - 1];
+            }
+
+            if (!(*cpbuf))
+                *cpbuf = pd_smbuf_init(buf);
+            else
+                pd_smbuf_insert_buf(cpbuf, buf);
+
+            bzero(buf, 129);
             pbuf = buf;
             cmd++;
         }
@@ -82,24 +122,32 @@ pd_smbuf_t *pd_cmd_parse_cmd(const char *cmd)
         pbuf++;
     }
 
-    if (!cmds)
-        cmds = pd_smbuf_init(buf);
-    else
-        pd_smbuf_append(&cmds, pd_smbuf_init(buf));
+    if (!cpbuf) {
+        cpbuf = &targs->pcmd;
+        targs->plen++;
+    } else {
+        cpbuf = &targs->paux[targs->plen++ - 1];
+    }
 
-    return cmds;
+    if (!(*cpbuf))
+        *cpbuf = pd_smbuf_init(buf);
+    else
+        pd_smbuf_insert_buf(cpbuf, buf);
+
+    targs->plen--;
+    return 0;
 }
 
-int pd_cmd_validate_cmd(pd_smbuf_t *cmds)
+int pd_cmd_validate_cmd(pd_cmd_args_t *pargs)
 {
     int i, found;
     size_t arity;
 
     found = 0;
-    arity = pd_smbuf_nodelen(cmds) - 1;
+    arity = pargs->plen;
 
     for (i = 0; i < sizeof(avail_cmds) / sizeof(pd_cmd_t); i++) {
-        if (!strcmp(cmds->buf, avail_cmds[i].cmd) &&
+        if (!strcmp(pargs->pcmd->buf, avail_cmds[i].cmd) &&
             arity == avail_cmds[i].arity) {
             found = 1;
             break;
@@ -107,4 +155,25 @@ int pd_cmd_validate_cmd(pd_smbuf_t *cmds)
     }
 
     return !found ? -1 : 0;
+}
+
+void pd_cmd_args_release(pd_cmd_args_t **pargs)
+{
+    pd_cmd_args_release_smbuf(pargs);
+    free(*pargs);
+}
+
+void pd_cmd_args_release_smbuf(pd_cmd_args_t **pargs)
+{
+    int i;
+
+    pd_smbuf_release((*pargs)->pcmd);
+
+    for (i = 0; i < (*pargs)->plen; i++) {
+        pd_smbuf_release((*pargs)->paux[i]);
+        (*pargs)->paux[i] = NULL;
+    }
+
+    (*pargs)->pcmd = NULL;
+    (*pargs)->plen = 0;
 }

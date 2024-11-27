@@ -39,6 +39,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 
 #include <pd_net.h>
@@ -210,6 +211,45 @@ int pd_net_accept_clear_nb(pd_net_t **net)
         return -1;
 
     ret = fcntl((*net)->accept, F_SETFL, flags & ~O_NONBLOCK);
+
+    if (ret < 0)
+        return -1;
+
+    return 0;
+}
+
+int pd_net_socket_set_opt_reuseaddr(pd_net_t **net)
+{
+    int ret, val = 1;
+
+    ret = setsockopt((*net)->fd,
+                     SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+
+    if (ret < 0)
+        return -1;
+
+    return 0;
+}
+
+int pd_net_socket_set_opt_keepalive(pd_net_t **net)
+{
+    int ret, val = 1;
+
+    ret = setsockopt((*net)->fd,
+                     SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
+
+    if (ret < 0)
+        return -1;
+
+    return 0;
+}
+
+int pd_net_socket_set_opt_tcp_nodelay(pd_net_t **net)
+{
+    int ret, val = 1;
+
+    ret = setsockopt((*net)->fd,
+                     IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));
 
     if (ret < 0)
         return -1;

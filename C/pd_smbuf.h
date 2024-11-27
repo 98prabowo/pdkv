@@ -53,6 +53,7 @@ typedef struct pd_smbuf {
 
 pd_smbuf_t *pd_smbuf_alloc(void);
 pd_smbuf_t *pd_smbuf_init(const char *buf);
+pd_smbuf_t *pd_smbuf_copy(pd_smbuf_t *sbuf);
 
 void pd_smbuf_insert_buf(pd_smbuf_t **root, const char *buf);
 void pd_smbuf_append(pd_smbuf_t **root, pd_smbuf_t *buf);

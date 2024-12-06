@@ -35,3 +35,25 @@ impl Worker {
         Worker { id, thread }
     }
 }
+
+#[cfg(test)]
+mod worker_tests {
+    use std::{sync::mpsc::channel, time::Duration};
+
+    use super::*;
+
+    #[test]
+    fn worker_process_job_test() {
+        let (sender, receiver) = channel();
+        let receiver = Arc::new(Mutex::new(receiver));
+        let _sut = Worker::new(0, receiver);
+
+        let (rsend, rrecv) = channel();
+        let job = move || rsend.send(()).unwrap();
+        let job = Box::new(job);
+
+        sender.send(job).unwrap();
+
+        assert_eq!(rrecv.recv_timeout(Duration::from_secs(1)), Ok(()));
+    }
+}

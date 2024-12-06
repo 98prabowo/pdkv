@@ -5,7 +5,10 @@ use std::{
 };
 
 use crate::{
-    controller::Controller, error::Result, model::AtomicDB, pool::ThreadPool
+    controller::Controller, 
+    error::Result, 
+    model::AtomicDB, 
+    pool::ThreadPool,
 };
 
 pub struct Server {

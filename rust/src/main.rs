@@ -13,6 +13,5 @@ fn main() -> Result<()> {
     let ip = Ipv4Addr::new(127, 0, 0, 1);
     let addr = IpAddr::V4(ip);
     let port: u16 = 31337;
-    let server: Server = Server::init(addr, port);
-    server.run()
+    Server::init(addr, port).run()
 }

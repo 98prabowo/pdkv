@@ -3,31 +3,39 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-pub type Job = Box<dyn FnOnce() + Send + 'static>;
+use crate::error::Result;
+
+use super::Error;
+
+pub type Task = Box<dyn FnOnce() -> Result<()> + Send + 'static>;
 
 pub struct Worker {
     pub id: usize,
-    pub thread: Option<JoinHandle<()>>,
+    pub thread: Option<JoinHandle<Result<()>>>,
 }
 
 impl Worker {
-    pub fn new(id: usize, receiver: Arc<Mutex<Receiver<Job>>>) -> Self {
-        let thread = thread::spawn(move || loop {
-            let message = receiver
-                .lock()
-                .expect("Mutex got poisoned state")
-                .recv();
+    pub fn new(id: usize, receiver: Arc<Mutex<Receiver<Task>>>) -> Self {
+        let thread = thread::spawn(move || -> Result<()> {
+            loop {
+                let message = receiver
+                    .lock()
+                    .map_err(|_| Error::MutexPoisoned)? 
+                    .recv();
 
-            match message {
-                Ok(job) => {
-                    println!("Worker {id} got a job; executing.");
-                    job();
-                }
-                Err(_) => {
-                    println!("Worker {id} disconnected; shutting down.");
-                    break;
+                match message {
+                    Ok(job) => {
+                        println!("{} {:<2} - executing", "WORKER", id);
+                        job()?;
+                    }
+                    Err(_) => {
+                        println!("{} {:<2} - disconnected", "WORKER", id);
+                        break;
+                    }
                 }
             }
+
+            Ok(())
         });
 
         let thread = Some(thread);
@@ -49,7 +57,10 @@ mod worker_tests {
         let _sut = Worker::new(0, receiver);
 
         let (rsend, rrecv) = channel();
-        let job = move || rsend.send(()).unwrap();
+        let job = move || -> Result<()> { 
+            rsend.send(()).unwrap();
+            Ok(())
+        };
         let job = Box::new(job);
 
         sender.send(job).unwrap();

@@ -16,7 +16,9 @@ impl Controller {
 
         if let Some(Ok(request_line)) = buf_reader.lines().next() {
             let respond: String = Self::handle_cmd(db, request_line);
-            stream.write_all(respond.as_bytes()).unwrap();
+            if let Err(error) = stream.write_all(respond.as_bytes()) {
+                println!("{:<2} - fail send response. Reason: {}", "TCP", error);
+            }
         }
     }
 
@@ -118,7 +120,7 @@ mod controller_tests {
     }
 
     #[test]
-    fn input_handler_test_with_unknown_cmd() {
+    fn input_handler_with_unknown_cmd_test() {
         let (sut, request_line) = make_sut();
         let response: String = Controller::handle_cmd(sut, request_line);
         assert_eq!(response, "Unknown command\n");

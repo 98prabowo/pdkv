@@ -32,8 +32,9 @@ impl Server {
             if let Ok(mut stream) = stream {
                 let db = Arc::clone(&self.db);
 
-                pool.execute(move || {
+                pool.execute(move || -> Result<()> {
                     Controller::handle_input(&mut stream, db);
+                    Ok(())
                 })?;
             }
         }

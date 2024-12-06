@@ -4,19 +4,20 @@ use std::sync::{
     Mutex
 };
 
+use crate::error;
+
 use super::{
-    worker::{Job, Worker}, 
-    Error, 
-    Result
+    worker::{Task, Worker}, 
+    Error 
 };
 
 pub struct ThreadPool {
     workers: Vec<Worker>,
-    sender: Option<Sender<Job>>,
+    sender: Option<Sender<Task>>,
 }
 
 impl ThreadPool {
-    pub fn build(size: usize) -> Result<Self> {
+    pub fn build(size: usize) -> super::Result<Self> {
         if size <= 0 {
             return Err(Error::InvalidPoolSize)
         }
@@ -35,9 +36,9 @@ impl ThreadPool {
         Ok(Self { workers, sender })
     }
 
-    pub fn execute<F>(&self, task: F) -> Result<()>
+    pub fn execute<F>(&self, task: F) -> super::Result<()>
     where 
-        F: FnOnce() + Send + 'static
+        F: FnOnce() -> error::Result<()> + Send + 'static
     {
         let job = Box::new(task);
 
@@ -56,12 +57,13 @@ impl Drop for ThreadPool {
         drop(self.sender.take());
 
         for worker in &mut self.workers {
-            println!("Shutting down worker {}", worker.id);
+            println!("{} {:<2} - shutting down", "WORKER", worker.id);
 
             if let Some(thread) = worker.thread.take() {
                 thread
                     .join()
-                    .expect(format!("Couldn't join thread on worker {}", worker.id).as_str());
+                    .unwrap()
+                    .expect(format!("{} {:<2} - thread join fail", "WORKER", worker.id).as_str())
             }
         }
     }
@@ -93,7 +95,10 @@ mod threadpool_tests {
         let sut = ThreadPool::build(10);
 
         let (tx, rx) = channel();
-        let task = move || tx.send(()).unwrap();
+        let task = move || -> error::Result<()> {
+            tx.send(()).unwrap();
+            Ok(())
+        };
         
         sut.unwrap().execute(task).unwrap();
 

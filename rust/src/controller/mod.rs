@@ -24,7 +24,7 @@ impl Controller {
         db: AtomicDB,
         request_line: String
     ) -> String {
-        match Command::new(&request_line) {
+        match request_line.parse() {
             Ok(Command::GET(key))           => Controller::handle_get(db, key),
             Ok(Command::SET{ key, value })  => Controller::handle_set(db, key, value),
             Ok(Command::DELETE(key))        => Controller::handle_del(db, key),
@@ -80,5 +80,55 @@ impl Controller {
             }
             Err(_) => "Failed to delete data\n".into(),
         }
+    }
+}
+
+#[cfg(test)]
+mod controller_tests {
+    use std::{collections::HashMap, sync::{Arc, Mutex}};
+
+    use super::*;
+
+    #[test]
+    fn get_handler_test() {
+        let (sut, key) = make_sut();
+        let response: String = Controller::handle_get(sut, key);
+        assert_eq!(response, "No value for key: abc\n");
+    }
+
+    #[test]
+    fn set_handler_test() {
+        let (sut, key) = make_sut();
+        let _: String = Controller::handle_set(Arc::clone(&sut), key.clone(), "10".into());
+        let response: String = Controller::handle_get(Arc::clone(&sut), key.clone());
+        assert_eq!(response, "10\n");
+    }
+
+    #[test]
+    fn del_handler_test() {
+        let (sut, key) = make_sut();
+
+        let _set_value: String = Controller::handle_set(Arc::clone(&sut), key.clone(), "10".into());
+        let response: String = Controller::handle_get(Arc::clone(&sut), key.clone());
+        assert_eq!(response, "10\n");
+
+        let _delete_value: String = Controller::handle_del(Arc::clone(&sut), key.clone());
+        let response: String = Controller::handle_get(Arc::clone(&sut), key.clone());
+        assert_eq!(response, "No value for key: abc\n");
+    }
+
+    #[test]
+    fn input_handler_test_with_unknown_cmd() {
+        let (sut, request_line) = make_sut();
+        let response: String = Controller::handle_cmd(sut, request_line);
+        assert_eq!(response, "Unknown command\n");
+    }
+
+    // Helpers
+
+    fn make_sut() -> (AtomicDB, String) {
+        let sut: AtomicDB = Arc::new(Mutex::new(HashMap::new()));
+        let key: String = String::from("abc");
+        (sut, key)
     }
 }

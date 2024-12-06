@@ -1,6 +1,4 @@
-pub type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     KeyNotFound,
     ValueNotFound,

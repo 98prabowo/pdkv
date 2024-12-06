@@ -5,7 +5,10 @@ use std::{
 };
 
 use crate::{
-    controller::Controller, error::Result, model::AtomicDB, pool::ThreadPool
+    controller::Controller, 
+    error::Result, 
+    model::AtomicDB, 
+    pool::ThreadPool,
 };
 
 pub struct Server {
@@ -29,8 +32,9 @@ impl Server {
             if let Ok(mut stream) = stream {
                 let db = Arc::clone(&self.db);
 
-                pool.execute(move || {
+                pool.execute(move || -> Result<()> {
                     Controller::handle_input(&mut stream, db);
+                    Ok(())
                 })?;
             }
         }
